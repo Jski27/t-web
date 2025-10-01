@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Line, Bar } from 'react-chartjs-2';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,7 +10,8 @@ import {
   Tooltip,
   Legend,
   Filler,
-  Title
+  Title,
+  ArcElement
 } from 'chart.js';
 import { motion } from 'framer-motion';
 
@@ -23,30 +24,31 @@ ChartJS.register(
   Tooltip,
   Legend,
   Filler,
-  Title
+  Title,
+  ArcElement
 );
 
-// Mock analytics data
-const mockData = {
-  pageViews: [
-    { date: '2025-09-01', views: 120 },
-    { date: '2025-09-02', views: 180 },
-    { date: '2025-09-03', views: 90 },
-    { date: '2025-09-04', views: 240 },
-    { date: '2025-09-05', views: 320 },
-    { date: '2025-09-06', views: 280 },
-    { date: '2025-09-07', views: 300 },
-  ],
-  buttonClicks: {
-    listen: 420,
-    book: 610
-  },
-  engagement: {
-    avgSessionMinutes: 3.6,
-    bounceRate: 42, // percent
-    totalClicks: 1580
-  }
-};
+import { generateTimeSeries, generateDistribution, percentChange, formatNumber, kFormat } from './dashboard-utils';
+
+// Seeded / generated mock dataset factory
+function buildMock(days) {
+  const pageViews = generateTimeSeries(days, 300, 0.55);
+  const sessions = generateTimeSeries(days, 120, 0.5);
+  const clicks = generateTimeSeries(days, 800, 0.7);
+  const ctaDistribution = generateDistribution(['Listen', 'Book Now', 'Gallery', 'Contact'], 2000);
+  const geo = generateDistribution(['US', 'UK', 'DE', 'NL', 'CA', 'AU'], 3500).sort((a,b)=>b.value-a.value);
+  const devices = generateDistribution(['Mobile','Desktop','Tablet'], 1800);
+  const referrers = generateDistribution(['Direct','Instagram','TikTok','Email','Other'], 2200);
+  return {
+    pageViews,
+    sessions,
+    clicks,
+    ctaDistribution,
+    geo,
+    devices,
+    referrers
+  };
+}
 
 const PASSWORD = 't-hein-admin';
 
@@ -58,6 +60,29 @@ const cardVariants = {
 const Dashboard = () => {
   const [pass, setPass] = useState('');
   const [authed, setAuthed] = useState(false);
+  const [range, setRange] = useState(30);
+  const [dataset, setDataset] = useState(() => buildMock(range));
+  const [dark, setDark] = useState(true);
+  const [showRaw, setShowRaw] = useState(false);
+
+  useEffect(() => {
+    setDataset(buildMock(range));
+  }, [range]);
+
+  useEffect(() => {
+    const cl = document.documentElement.classList;
+    if (dark) cl.add('dark'); else cl.remove('dark');
+  }, [dark]);
+
+  const toggleTheme = () => setDark(d => !d);
+  const refreshData = () => setDataset(buildMock(range));
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify(dataset, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `analytics-mock-${Date.now()}.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -65,44 +90,84 @@ const Dashboard = () => {
   };
 
   const pageViewsData = useMemo(() => {
-    const labels = mockData.pageViews.map(p => p.date.slice(5));
+    const labels = dataset.pageViews.map(p => p.date.slice(5));
     return {
       labels,
       datasets: [
         {
           label: 'Page Views',
-            data: mockData.pageViews.map(p => p.views),
-            fill: true,
-            tension: 0.35,
-            borderColor: '#14f1ff',
-            backgroundColor: (ctx) => {
-              const { chart } = ctx;
-              const gradient = chart.ctx.createLinearGradient(0, 0, 0, chart.height);
-              gradient.addColorStop(0, 'rgba(20,241,255,0.45)');
-              gradient.addColorStop(1, 'rgba(20,241,255,0)');
-              return gradient;
-            },
-            pointRadius: 3,
-            pointBackgroundColor: '#14f1ff'
+          data: dataset.pageViews.map(p => p.value),
+          fill: true,
+          tension: 0.35,
+          borderColor: '#14f1ff',
+          backgroundColor: (ctx) => {
+            const { chart } = ctx;
+            const gradient = chart.ctx.createLinearGradient(0, 0, 0, chart.height);
+            gradient.addColorStop(0, 'rgba(20,241,255,0.45)');
+            gradient.addColorStop(1, 'rgba(20,241,255,0)');
+            return gradient;
+          },
+          pointRadius: 2,
+          pointBackgroundColor: '#14f1ff'
         }
       ]
     };
-  }, []);
+  }, [dataset]);
 
-  const buttonClicksData = useMemo(() => {
-    return {
-      labels: ['Listen', 'Book Now'],
-      datasets: [
-        {
-          label: 'Clicks',
-          data: [mockData.buttonClicks.listen, mockData.buttonClicks.book],
-          backgroundColor: ['#14f1ff', '#ff007a'],
-          borderRadius: 8,
-          borderWidth: 0
-        }
-      ]
-    };
-  }, []);
+  const ctaBarData = useMemo(() => ({
+    labels: dataset.ctaDistribution.map(c => c.label),
+    datasets: [{
+      label: 'CTA Clicks',
+      data: dataset.ctaDistribution.map(c => c.value),
+      backgroundColor: ['#14f1ff','#ff007a','#6a00ff','#4effa1'],
+      borderRadius: 10,
+      borderWidth: 0
+    }]
+  }), [dataset]);
+
+  const deviceDoughnut = useMemo(() => ({
+    labels: dataset.devices.map(d => d.label),
+    datasets: [{
+      data: dataset.devices.map(d => d.value),
+      backgroundColor: ['#14f1ff','#ff007a','#6a00ff'],
+      borderWidth: 0,
+      hoverOffset: 6
+    }]
+  }), [dataset]);
+
+  const referrerDoughnut = useMemo(() => ({
+    labels: dataset.referrers.map(d => d.label),
+    datasets: [{
+      data: dataset.referrers.map(d => d.value),
+      backgroundColor: ['#14f1ff','#ff007a','#6a00ff','#ffb800','#4effa1'],
+      borderWidth: 0,
+      hoverOffset: 6
+    }]
+  }), [dataset]);
+
+  const sessionsLine = useMemo(() => ({
+    labels: dataset.sessions.map(p => p.date.slice(5)),
+    datasets: [{
+      label: 'Sessions',
+      data: dataset.sessions.map(p => p.value),
+      borderColor: '#ff007a',
+      tension: 0.35,
+      pointRadius: 0,
+      fill: false
+    }]
+  }), [dataset]);
+
+  const clicksLine = useMemo(() => ({
+    labels: dataset.clicks.map(p => p.date.slice(5)),
+    datasets: [{
+      label: 'Clicks',
+      data: dataset.clicks.map(p => p.value),
+      borderColor: '#6a00ff',
+      tension: 0.35,
+      pointRadius: 0,
+      fill: false
+    }]
+  }), [dataset]);
 
   const commonOptions = {
     responsive: true,
@@ -117,6 +182,28 @@ const Dashboard = () => {
       y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
     }
   };
+
+  const doughnutOptions = {
+    plugins: {
+      legend: { position: 'bottom', labels: { color: '#e5e7eb', boxWidth: 12 } },
+      tooltip: { backgroundColor: '#0f172a', borderColor: '#14f1ff', borderWidth: 1 }
+    },
+    cutout: '56%'
+  };
+
+  const metrics = useMemo(() => {
+    const pv = dataset.pageViews.reduce((a,b)=>a+b.value,0);
+    const sess = dataset.sessions.reduce((a,b)=>a+b.value,0);
+    const clk = dataset.clicks.reduce((a,b)=>a+b.value,0);
+    const pvPrev = pv * 0.92; // fake previous period
+    const sessPrev = sess * 0.9;
+    const clkPrev = clk * 0.88;
+    return [
+      { label: 'Page Views', value: pv, change: percentChange(pv, pvPrev) },
+      { label: 'Sessions', value: sess, change: percentChange(sess, sessPrev) },
+      { label: 'Clicks', value: clk, change: percentChange(clk, clkPrev) }
+    ];
+  }, [dataset]);
 
   if (!authed) {
     return (
@@ -138,55 +225,119 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-dark text-white pb-20">
-      <div className="sticky top-0 z-30 backdrop-blur-md bg-black/40 border-b border-white/10 px-6 py-4 flex items-center justify-between">
-        <h1 className="font-display text-xl tracking-wide">Dashboard</h1>
-        <button onClick={() => setAuthed(false)} className="text-xs text-white/60 hover:text-accent transition">Logout</button>
+    <div className="min-h-screen bg-dark text-white pb-32">
+      <div className="sticky top-0 z-40 backdrop-blur-md bg-black/40 border-b border-white/10 px-6 py-4 flex items-center gap-4">
+        <h1 className="font-display text-xl tracking-wide">Analytics Dashboard</h1>
+        <div className="ml-auto flex items-center gap-3">
+          <select value={range} onChange={e=>setRange(Number(e.target.value))} className="bg-dark/60 border border-white/10 rounded-md text-xs px-2 py-1 focus:outline-none focus:ring-2 focus:ring-neon">
+            {[7,14,30,60,90].map(r=> <option key={r} value={r}>{r}d</option>)}
+          </select>
+          <button onClick={refreshData} className="text-xs px-3 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10">Refresh</button>
+          <button onClick={exportJSON} className="text-xs px-3 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10">Export</button>
+          <button onClick={()=>setShowRaw(r=>!r)} className="text-xs px-3 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10">{showRaw ? 'Hide Raw' : 'Raw'}</button>
+          <button onClick={toggleTheme} className="text-xs px-3 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10">{dark ? 'Light' : 'Dark'}</button>
+          <button onClick={() => setAuthed(false)} className="text-xs text-white/60 hover:text-accent transition">Logout</button>
+        </div>
       </div>
-      <div className="max-w-7xl mx-auto px-6 pt-10 space-y-14">
+      <div className="max-w-7xl mx-auto px-6 pt-10 space-y-16">
+        {/* Metric Headline Cards */}
         <section>
-          <h2 className="font-display text-lg md:text-2xl font-semibold mb-6 flex items-center gap-2">
-            <span className="text-neon">1.</span> Page Views
-          </h2>
-          <div className="glass rounded-xl p-4 h-72">
-            <Line data={pageViewsData} options={commonOptions} />
-          </div>
-        </section>
-
-        <section>
-          <h2 className="font-display text-lg md:text-2xl font-semibold mb-6 flex items-center gap-2">
-            <span className="text-neon">2.</span> Most Clicked Buttons
-          </h2>
-          <div className="glass rounded-xl p-4 h-72">
-            <Bar data={buttonClicksData} options={commonOptions} />
-          </div>
-        </section>
-
-        <section>
-          <h2 className="font-display text-lg md:text-2xl font-semibold mb-6 flex items-center gap-2">
-            <span className="text-neon">3.</span> Engagement Metrics
-          </h2>
           <div className="grid gap-6 md:grid-cols-3">
-            {[
-              { label: 'Avg Session (min)', value: mockData.engagement.avgSessionMinutes, fmt: v => v.toFixed(1) },
-              { label: 'Bounce Rate', value: mockData.engagement.bounceRate, fmt: v => v + '%' },
-              { label: 'Total Clicks', value: mockData.engagement.totalClicks, fmt: v => v.toLocaleString() }
-            ].map((m, i) => (
-              <motion.div
-                key={m.label}
-                variants={cardVariants}
-                initial="hidden"
-                whileInView="show"
-                custom={i}
-                viewport={{ once: true, amount: 0.4 }}
-                className="glass rounded-xl p-6 flex flex-col"
-              >
-                <span className="text-xs tracking-wide text-white/50 mb-2">{m.label}</span>
-                <span className="font-display text-3xl font-semibold text-neon">{m.fmt(m.value)}</span>
+            {metrics.map((m,i)=>(
+              <motion.div key={m.label} variants={cardVariants} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }} className="glass rounded-xl p-6 flex flex-col gap-3">
+                <span className="text-xs tracking-wide text-white/50">{m.label}</span>
+                <span className="font-display text-3xl font-semibold text-neon">{kFormat(m.value)}</span>
+                <span className={`text-xs font-medium ${m.change>=0 ? 'text-emerald-400' : 'text-red-400'}`}>{m.change>=0?'+':''}{m.change.toFixed(1)}%</span>
               </motion.div>
             ))}
           </div>
         </section>
+
+        {/* Traffic & Engagement Overview */}
+        <section className="grid lg:grid-cols-3 gap-10">
+          <div className="lg:col-span-2 space-y-10">
+            <div>
+              <h2 className="font-display text-lg md:text-2xl font-semibold mb-4 flex items-center gap-2"><span className="text-neon">1.</span> Page Views</h2>
+              <div className="glass rounded-xl p-4 h-72">
+                <Line data={pageViewsData} options={commonOptions} />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-10">
+              <div className="glass rounded-xl p-4 h-60">
+                <Line data={sessionsLine} options={commonOptions} />
+              </div>
+              <div className="glass rounded-xl p-4 h-60">
+                <Line data={clicksLine} options={commonOptions} />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-10">
+            <div>
+              <h3 className="text-sm font-semibold mb-3 tracking-wide text-white/70">Device Mix</h3>
+              <div className="glass rounded-xl p-4 h-72 flex items-center justify-center">
+                <Doughnut data={deviceDoughnut} options={doughnutOptions} />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold mb-3 tracking-wide text-white/70">Referrer Breakdown</h3>
+              <div className="glass rounded-xl p-4 h-72 flex items-center justify-center">
+                <Doughnut data={referrerDoughnut} options={doughnutOptions} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Performance */}
+        <section>
+          <h2 className="font-display text-lg md:text-2xl font-semibold mb-6 flex items-center gap-2"><span className="text-neon">2.</span> CTA Performance</h2>
+          <div className="glass rounded-xl p-4 h-80">
+            <Bar data={ctaBarData} options={commonOptions} />
+          </div>
+        </section>
+
+        {/* Geography Table */}
+        <section>
+          <h2 className="font-display text-lg md:text-2xl font-semibold mb-6 flex items-center gap-2"><span className="text-neon">3.</span> Top Regions</h2>
+          <div className="glass rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-white/5 text-white/60 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="text-left px-4 py-3">Region</th>
+                  <th className="text-left px-4 py-3">Value</th>
+                  <th className="text-left px-4 py-3">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dataset.geo.map((g,i)=>{
+                  const total = dataset.geo.reduce((a,b)=>a+b.value,0);
+                  const pct = (g.value/total)*100;
+                  return (
+                    <tr key={g.label} className="border-t border-white/5 hover:bg-white/5">
+                      <td className="px-4 py-2 font-medium text-white/80">{g.label}</td>
+                      <td className="px-4 py-2 text-white/70">{formatNumber(g.value)}</td>
+                      <td className="px-4 py-2 text-white/50">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 rounded-full bg-neon" style={{width: pct.toFixed(2)+'%'}} />
+                          <span className="text-xs">{pct.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Raw JSON toggle */}
+        {showRaw && (
+          <section>
+            <h2 className="font-display text-lg md:text-2xl font-semibold mb-4">Raw Dataset</h2>
+            <pre className="glass p-4 rounded-xl max-h-96 overflow-auto text-xs whitespace-pre-wrap leading-relaxed">
+{JSON.stringify(dataset,null,2)}
+            </pre>
+          </section>
+        )}
       </div>
     </div>
   );
