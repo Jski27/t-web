@@ -20,10 +20,10 @@ const About = () => {
         className="text-lg leading-relaxed text-white/80 space-y-4"
       >
         <span>
-          DJ NEXUS is a genre-bending performer blending pulsating techno, atmospheric house, and bass-driven rhythms into immersive, high-energy sets. Each performance is crafted to take the crowd on a journey through layered emotion and kinetic momentum.
+          DJ T-Hein is an Oxford, Ohio based performer blending upbeat house grooves, modern dance edits, and energy-lift transitions designed for campus nightlife and private events. Every set focuses on reading the room and building momentum organically.
         </span>{' '}
         <span>
-          With a focus on sonic storytelling, seamless transitions, and luminous aesthetics, NEXUS creates unforgettable night experiences built around connection, movement, and elevation.
+          Centered on clean transitions, crowd interaction, and a feel-good atmosphere, T-Hein delivers reliable, dance-floor focused mixes that keep people engaged start to finish.
         </span>
       </motion.p>
     </section>

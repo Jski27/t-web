@@ -24,7 +24,7 @@ const Navbar = () => {
     <header className={`fixed top-0 left-0 w-full z-40 transition backdrop-blur-md ${scrolled ? 'bg-dark/70 border-b border-white/10' : 'bg-transparent'}`}>
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
         <a href="#home" className="font-display text-2xl font-bold tracking-wider flex items-center gap-2">
-          <span className="text-neon">NEXUS</span>
+          <span className="text-neon">DJ T-Hein</span>
         </a>
         <nav className="hidden md:flex gap-8 text-sm">
           {links.map(l => (

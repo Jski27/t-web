@@ -28,10 +28,10 @@ const Contact = () => {
             For bookings, collaborations, or media inquiries—reach out using the form. Management will respond within 24–48 hours.
           </p>
           <div className="space-y-4 text-sm">
-            <p><span className="text-neon">Email:</span> booking@nexus.dj</p>
-            <p><span className="text-neon">Based in:</span> Europe / Available Worldwide</p>
+            <p><span className="text-neon">Email:</span> booking@t-hein.com</p>
+            <p><span className="text-neon">Based in:</span> Oxford, Ohio (Available for regional events)</p>
             <div className="flex gap-4 pt-2">
-              {['spotify','soundcloud','instagram','tiktok'].map(s => (
+              {['instagram','tiktok'].map(s => (
                 <a key={s} href="#" aria-label={s} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition border border-white/10">
                   <span className="capitalize text-xs">{s}</span>
                 </a>

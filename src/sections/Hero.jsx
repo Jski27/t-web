@@ -12,7 +12,7 @@ const Hero = () => {
           transition={{ duration: 0.8 }}
           className="font-display text-5xl md:text-7xl font-bold tracking-tight neon-text"
         >
-          DJ NEXUS
+          DJ T-Hein
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 40 }}
@@ -20,7 +20,7 @@ const Hero = () => {
           transition={{ duration: 0.9, delay: 0.15 }}
           className="mt-6 text-lg md:text-2xl text-white/80"
         >
-          Elevating nights with high-energy beats, immersive soundscapes, and neon-drenched vibes.
+          High-energy sets and feel‑good vibes based out of Oxford, Ohio. Sound journeys crafted to keep the crowd moving.
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 40 }}
