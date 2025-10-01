@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -30,11 +30,11 @@ ChartJS.register(
 
 import { percentChange, formatNumber, kFormat } from './dashboard-utils';
 import { buildMockDataset, computeHeadlineMetrics } from '../services/analyticsService';
+import { api } from '../api/client';
+import { verifyPassword } from '../security/hash';
 
 // Seeded / generated mock dataset factory
 const buildMock = buildMockDataset;
-
-const PASSWORD = 't-hein-admin';
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -46,13 +46,12 @@ const Dashboard = () => {
   const [authed, setAuthed] = useState(false);
   const [range, setRange] = useState(30);
   const [dataset, setDataset] = useState(() => buildMock(range));
-  // Removed insights / rule findings state per user request.
   const [dark, setDark] = useState(true);
   const [showRaw, setShowRaw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const ds = buildMock(range);
-    setDataset(ds);
+  useEffect(() => { refreshData(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range]);
 
   useEffect(() => {
@@ -61,21 +60,27 @@ const Dashboard = () => {
   }, [dark]);
 
   const toggleTheme = () => setDark(d => !d);
-  const refreshData = () => {
-    const ds = buildMock(range);
-    setDataset(ds);
-  };
-  const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(dataset, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `analytics-mock-${Date.now()}.json`; a.click();
-    URL.revokeObjectURL(url);
+  const refreshData = async () => {
+    setLoading(true); setError(null);
+    try {
+      const remote = await api.getAnalytics();
+      if (remote && remote.pageViews) {
+        setDataset(remote);
+      } else {
+        setDataset(buildMock(range));
+      }
+    } catch (e) {
+      setError(e.message || 'Fetch failed');
+      setDataset(buildMock(range));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (pass === PASSWORD) setAuthed(true); else alert('Incorrect password');
+    const ok = await verifyPassword(pass);
+    if (ok) setAuthed(true); else alert('Incorrect password');
   };
 
   const pageViewsData = useMemo(() => {
