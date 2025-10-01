@@ -28,27 +28,12 @@ ChartJS.register(
   ArcElement
 );
 
-import { generateTimeSeries, generateDistribution, percentChange, formatNumber, kFormat } from './dashboard-utils';
+import { percentChange, formatNumber, kFormat } from './dashboard-utils';
+import { buildMockDataset, computeHeadlineMetrics, deriveInsights } from '../services/analyticsService';
+import { evaluateRules } from '../services/businessRules';
 
 // Seeded / generated mock dataset factory
-function buildMock(days) {
-  const pageViews = generateTimeSeries(days, 300, 0.55);
-  const sessions = generateTimeSeries(days, 120, 0.5);
-  const clicks = generateTimeSeries(days, 800, 0.7);
-  const ctaDistribution = generateDistribution(['Listen', 'Book Now', 'Gallery', 'Contact'], 2000);
-  const geo = generateDistribution(['US', 'UK', 'DE', 'NL', 'CA', 'AU'], 3500).sort((a,b)=>b.value-a.value);
-  const devices = generateDistribution(['Mobile','Desktop','Tablet'], 1800);
-  const referrers = generateDistribution(['Direct','Instagram','TikTok','Email','Other'], 2200);
-  return {
-    pageViews,
-    sessions,
-    clicks,
-    ctaDistribution,
-    geo,
-    devices,
-    referrers
-  };
-}
+const buildMock = buildMockDataset;
 
 const PASSWORD = 't-hein-admin';
 
@@ -62,11 +47,14 @@ const Dashboard = () => {
   const [authed, setAuthed] = useState(false);
   const [range, setRange] = useState(30);
   const [dataset, setDataset] = useState(() => buildMock(range));
+  const [insights, setInsights] = useState([]);
+  const [ruleFindings, setRuleFindings] = useState([]);
   const [dark, setDark] = useState(true);
   const [showRaw, setShowRaw] = useState(false);
 
   useEffect(() => {
-    setDataset(buildMock(range));
+    const ds = buildMock(range);
+    setDataset(ds);
   }, [range]);
 
   useEffect(() => {
@@ -75,7 +63,10 @@ const Dashboard = () => {
   }, [dark]);
 
   const toggleTheme = () => setDark(d => !d);
-  const refreshData = () => setDataset(buildMock(range));
+  const refreshData = () => {
+    const ds = buildMock(range);
+    setDataset(ds);
+  };
   const exportJSON = () => {
     const blob = new Blob([JSON.stringify(dataset, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -192,17 +183,17 @@ const Dashboard = () => {
   };
 
   const metrics = useMemo(() => {
-    const pv = dataset.pageViews.reduce((a,b)=>a+b.value,0);
-    const sess = dataset.sessions.reduce((a,b)=>a+b.value,0);
-    const clk = dataset.clicks.reduce((a,b)=>a+b.value,0);
-    const pvPrev = pv * 0.92; // fake previous period
-    const sessPrev = sess * 0.9;
-    const clkPrev = clk * 0.88;
+    const headline = computeHeadlineMetrics(dataset);
     return [
-      { label: 'Page Views', value: pv, change: percentChange(pv, pvPrev) },
-      { label: 'Sessions', value: sess, change: percentChange(sess, sessPrev) },
-      { label: 'Clicks', value: clk, change: percentChange(clk, clkPrev) }
+      { label: 'Page Views', value: headline.pageViews.current, change: percentChange(headline.pageViews.current, headline.pageViews.previous) },
+      { label: 'Sessions', value: headline.sessions.current, change: percentChange(headline.sessions.current, headline.sessions.previous) },
+      { label: 'Clicks', value: headline.clicks.current, change: percentChange(headline.clicks.current, headline.clicks.previous) }
     ];
+  }, [dataset]);
+
+  useEffect(()=>{
+    setInsights(deriveInsights(dataset));
+    setRuleFindings(evaluateRules(dataset));
   }, [dataset]);
 
   if (!authed) {
@@ -250,6 +241,34 @@ const Dashboard = () => {
                 <span className={`text-xs font-medium ${m.change>=0 ? 'text-emerald-400' : 'text-red-400'}`}>{m.change>=0?'+':''}{m.change.toFixed(1)}%</span>
               </motion.div>
             ))}
+          </div>
+        </section>
+
+        {/* Insights & Rule Findings */}
+        <section className="grid lg:grid-cols-2 gap-10">
+          <div className="space-y-4">
+            <h2 className="font-display text-lg md:text-xl font-semibold flex items-center gap-2"><span className="text-neon">A.</span> Automated Insights</h2>
+            <div className="glass rounded-xl divide-y divide-white/5 overflow-hidden">
+              {insights.length === 0 && <p className="px-5 py-4 text-sm text-white/50">No notable insights detected.</p>}
+              {insights.map((ins,i)=>(
+                <div key={i} className="px-5 py-4 text-sm flex gap-3 items-start">
+                  <span className="text-neon text-xs mt-0.5">{ins.type.toUpperCase()}</span>
+                  <p className="text-white/80 leading-relaxed">{ins.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-4">
+            <h2 className="font-display text-lg md:text-xl font-semibold flex items-center gap-2"><span className="text-neon">B.</span> Business Rule Findings</h2>
+            <div className="glass rounded-xl divide-y divide-white/5 overflow-hidden">
+              {ruleFindings.length === 0 && <p className="px-5 py-4 text-sm text-white/50">No rule triggers.</p>}
+              {ruleFindings.map(r => (
+                <div key={r.id} className="px-5 py-4 text-sm flex gap-3 items-start">
+                  <span className={`text-xs mt-0.5 font-semibold ${r.severity==='warn'?'text-amber-400':'text-cyan-300'}`}>{r.severity.toUpperCase()}</span>
+                  <p className="text-white/80 leading-relaxed">{r.message}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
