@@ -29,8 +29,7 @@ ChartJS.register(
 );
 
 import { percentChange, formatNumber, kFormat } from './dashboard-utils';
-import { buildMockDataset, computeHeadlineMetrics, deriveInsights } from '../services/analyticsService';
-import { evaluateRules } from '../services/businessRules';
+import { buildMockDataset, computeHeadlineMetrics } from '../services/analyticsService';
 
 // Seeded / generated mock dataset factory
 const buildMock = buildMockDataset;
@@ -47,8 +46,7 @@ const Dashboard = () => {
   const [authed, setAuthed] = useState(false);
   const [range, setRange] = useState(30);
   const [dataset, setDataset] = useState(() => buildMock(range));
-  const [insights, setInsights] = useState([]);
-  const [ruleFindings, setRuleFindings] = useState([]);
+  // Removed insights / rule findings state per user request.
   const [dark, setDark] = useState(true);
   const [showRaw, setShowRaw] = useState(false);
 
@@ -191,10 +189,7 @@ const Dashboard = () => {
     ];
   }, [dataset]);
 
-  useEffect(()=>{
-    setInsights(deriveInsights(dataset));
-    setRuleFindings(evaluateRules(dataset));
-  }, [dataset]);
+  // Insights & business rule evaluation removed.
 
   if (!authed) {
     return (
@@ -244,33 +239,7 @@ const Dashboard = () => {
           </div>
         </section>
 
-        {/* Insights & Rule Findings */}
-        <section className="grid lg:grid-cols-2 gap-10">
-          <div className="space-y-4">
-            <h2 className="font-display text-lg md:text-xl font-semibold flex items-center gap-2"><span className="text-neon">A.</span> Automated Insights</h2>
-            <div className="glass rounded-xl divide-y divide-white/5 overflow-hidden">
-              {insights.length === 0 && <p className="px-5 py-4 text-sm text-white/50">No notable insights detected.</p>}
-              {insights.map((ins,i)=>(
-                <div key={i} className="px-5 py-4 text-sm flex gap-3 items-start">
-                  <span className="text-neon text-xs mt-0.5">{ins.type.toUpperCase()}</span>
-                  <p className="text-white/80 leading-relaxed">{ins.message}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h2 className="font-display text-lg md:text-xl font-semibold flex items-center gap-2"><span className="text-neon">B.</span> Business Rule Findings</h2>
-            <div className="glass rounded-xl divide-y divide-white/5 overflow-hidden">
-              {ruleFindings.length === 0 && <p className="px-5 py-4 text-sm text-white/50">No rule triggers.</p>}
-              {ruleFindings.map(r => (
-                <div key={r.id} className="px-5 py-4 text-sm flex gap-3 items-start">
-                  <span className={`text-xs mt-0.5 font-semibold ${r.severity==='warn'?'text-amber-400':'text-cyan-300'}`}>{r.severity.toUpperCase()}</span>
-                  <p className="text-white/80 leading-relaxed">{r.message}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        {/* Removed Automated Insights & Business Rule Findings sections */}
 
         {/* Traffic & Engagement Overview */}
         <section className="grid lg:grid-cols-3 gap-10">
